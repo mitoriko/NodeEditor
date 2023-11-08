@@ -27,7 +27,7 @@ import { log } from '../../common/log';
 import { getEffectivelyDisabledNodes } from '../../common/nodes/disabled';
 import { TypeState } from '../../common/nodes/TypeState';
 import { ipcRenderer } from '../../common/safeIpc';
-import { ParsedSaveData, SaveData, openSaveFile } from '../../common/SaveFile';
+import { ParsedSaveData, SaveData, SaveFile, openSaveFile } from '../../common/SaveFile';
 import {
     generateAssignmentErrorTrace,
     printErrorTrace,
@@ -161,13 +161,16 @@ export const GlobalContext = createContext<Readonly<Global>>({} as Global);
 
 interface GlobalProviderProps {
     reactFlowWrapper: React.RefObject<HTMLDivElement>;
+    data?: any;
+    onSwitchBack?: any;
 }
 
 export const GlobalProvider = memo(
-    ({ children, reactFlowWrapper }: React.PropsWithChildren<GlobalProviderProps>) => {
+    ({ children, reactFlowWrapper, data, onSwitchBack }: React.PropsWithChildren<GlobalProviderProps>) => {
         const { sendAlert, sendToast, showAlert } = useContext(AlertBoxContext);
         const { schemata, functionDefinitions, scope, backend } = useContext(BackendContext);
         const { useStartupTemplate, useViewportExportPadding } = useContext(SettingsContext);
+        const prevValue = useRef();
 
         const [nodeChanges, addNodeChanges, nodeChangesRef] = useChangeCounter();
         const [edgeChanges, addEdgeChanges, edgeChangesRef] = useChangeCounter();
@@ -675,6 +678,7 @@ export const GlobalProvider = memo(
                 [removeRecentPath, sendAlert]
             )
         );
+
 
         // Register Save/Save-As event handlers
         useIpcRendererListener(
@@ -1360,6 +1364,21 @@ export const GlobalProvider = memo(
             getInputHash,
             hasRelevantUnsavedChangesRef,
         });
+
+        useAsyncEffect(() => async () => {
+            if(data) {
+                prevValue.current = data;
+                await setStateFromJSONRef.current(SaveFile.parse(data.chainnerData), '', true);
+            }
+        }, [data])
+
+        useEffect(() => {
+                const json = SaveFile.stringify(dumpState(), '0.20.2');
+                let v = prevValue.current;
+                v = {...v, chainnerData: json};
+                onSwitchBack(v);
+                hasRelevantUnsavedChangesRef.current = false;
+        }, [nodeChanges, edgeChanges])
 
         return (
             <GlobalVolatileContext.Provider value={globalVolatileValue}>

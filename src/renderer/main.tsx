@@ -1,5 +1,5 @@
 import { Box, Center, HStack, Text, VStack } from '@chakra-ui/react';
-import { memo, useCallback, useRef } from 'react';
+import { useState, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EdgeTypes, NodeTypes, ReactFlowProvider } from 'reactflow';
 import { useContext } from 'use-context-selector';
@@ -21,6 +21,7 @@ import { NodeDocumentationProvider } from './contexts/NodeDocumentationContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { useIpcRendererListener } from './hooks/useIpcRendererListener';
 import { useLastWindowSize } from './hooks/useLastWindowSize';
+import TestView from './components/TestView';
 
 const nodeTypes: NodeTypes & Record<NodeType, unknown> = {
     regularNode: Node,
@@ -32,6 +33,8 @@ const edgeTypes: EdgeTypes = {
 };
 
 export const Main = memo(() => {
+    const [data, setData] = useState();
+    const [updateNode, setUpdateNode] = useState();
     const { t, ready } = useTranslation();
     const { sendAlert } = useContext(AlertBoxContext);
     const { connectionState } = useContext(BackendContext);
@@ -86,10 +89,14 @@ export const Main = memo(() => {
         );
     }
 
+    const handleSwitchBack = () => {
+        setData(undefined);
+    }
+
     return (
         <ReactFlowProvider>
             <SettingsProvider>
-                <GlobalProvider reactFlowWrapper={reactFlowWrapper}>
+                <GlobalProvider reactFlowWrapper={reactFlowWrapper} data={data} onSwitchBack={setUpdateNode}>
                     <NodeDocumentationProvider>
                         <ExecutionProvider>
                             <DependencyProvider>
@@ -100,8 +107,9 @@ export const Main = memo(() => {
                                         overflow="hidden"
                                         p={2}
                                         w="100vw"
+                                        hidden={data == undefined}
                                     >
-                                        <Header />
+                                        <Header onSwitchBack={handleSwitchBack} />
                                         <HStack
                                             h="calc(100vh - 80px)"
                                             w="full"
@@ -112,6 +120,25 @@ export const Main = memo(() => {
                                                 nodeTypes={nodeTypes}
                                                 wrapperRef={reactFlowWrapper}
                                             />
+                                        </HStack>
+                                    </VStack>
+                                    <VStack
+                                        bg="var(--window-bg)"
+                                        h="100vh"
+                                        overflow="hidden"
+                                        p={2}
+                                        w="100vw"
+                                        hidden={data != undefined}
+                                    >
+                                        <Header />
+                                        <HStack
+                                            h="calc(100vh - 80px)"
+                                            w="full"
+                                        >
+                                            <NodeSelector />
+                                            <ReactFlowProvider>
+                                                <TestView setData={setData} updateNode={updateNode} />
+                                            </ReactFlowProvider>
                                         </HStack>
                                     </VStack>
                                 </HistoryProvider>

@@ -8,7 +8,7 @@ import { AppInfo } from './AppInfo';
 import { ExecutionButtons } from './ExecutionButtons';
 import { KoFiButton } from './KoFiButton';
 
-export const Header = memo(() => {
+export const Header = memo(({onSwitchBack}) => {
     return (
         <Box
             alignItems="center"
@@ -21,7 +21,7 @@ export const Header = memo(() => {
             px={2}
             w="full"
         >
-            <Box>
+            <Box onClick={onSwitchBack}>
                 <AppInfo />
             </Box>
             <Center flexGrow="1">
