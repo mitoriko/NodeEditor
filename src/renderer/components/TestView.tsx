@@ -1,151 +1,103 @@
-import React, { useCallback, useEffect } from 'react';
-import ReactFlow, { useReactFlow, Controls, useNodesState, useEdgesState, addEdge, Node, Edge } from 'reactflow';
-import { FiFile } from 'react-icons/fi';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Button, Stack } from '@chakra-ui/react'
+import ReactFlow, {
+  Controls,
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  useReactFlow,
+  Panel,
+  applyNodeChanges,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 
-import 'reactflow/dist/base.css';
-import './index.css';
-import TurboNode, { TurboNodeData } from './TurboNode';
-import TurboEdge from './TurboEdge';
-import FunctionIcon from './FunctionIcon';
+const fs = require('fs')
 
-const initialNodes: Node<TurboNodeData>[] = [
-  {
-    id: '1',
-    position: { x: 0, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'readFile', subline: 'api.ts', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}',},
-    type: 'turbo',
-  },
-  {
-    id: '2',
-    position: { x: 250, y: 0 },
-    data: { icon: <FunctionIcon />, title: 'bundle', subline: 'apiContents' , chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}',},
-    type: 'turbo',
-  },
-  {
-    id: '3',
-    position: { x: 0, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'readFile', subline: 'sdk.ts', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}', },
-    type: 'turbo',
-  },
-  {
-    id: '4',
-    position: { x: 250, y: 250 },
-    data: { icon: <FunctionIcon />, title: 'bundle', subline: 'sdkContents', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}', },
-    type: 'turbo',
-  },
-  {
-    id: '5',
-    position: { x: 500, y: 125 },
-    data: { icon: <FunctionIcon />, title: 'concat', subline: 'api, sdk', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}', },
-    type: 'turbo',
-  },
-  {
-    id: '6',
-    position: { x: 750, y: 125 },
-    data: { icon: <FiFile />, title: 'fullBundle', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}', },
-    type: 'turbo',
-  },
-];
+const flowKey: string = 'example-flow';
 
-const initialEdges: Edge[] = [
-  {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-  },
-  {
-    id: 'e3-4',
-    source: '3',
-    target: '4',
-  },
-  {
-    id: 'e2-5',
-    source: '2',
-    target: '5',
-  },
-  {
-    id: 'e4-5',
-    source: '4',
-    target: '5',
-  },
-  {
-    id: 'e5-6',
-    source: '5',
-    target: '6',
-  },
-];
+const getNodeId = () => `randomnode_${+new Date()}`;
 
-const nodeTypes = {
-  turbo: TurboNode,
-};
+export default  ({setData, updateNode}) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const refNode = useRef();
+  const [rfInstance, setRfInstance] = useState();
+  const { setViewport, getNodes } = useReactFlow();
 
-const edgeTypes = {
-  turbo: TurboEdge,
-};
+  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
-const defaultEdgeOptions = {
-  type: 'turbo',
-  markerEnd: 'edge-circle',
-};
+  const onSave = useCallback(() => {
+    if (rfInstance) {
+      const flow = rfInstance.toObject();
+      fs.writeFileSync(`f:/${flowKey}.json`, JSON.stringify(flow));
+    }
+  }, [rfInstance]);
 
-const Flow = ({setData, updateNode}) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const {
-    getNodes,
-  } = useReactFlow();
-  const onConnect = useCallback((params) => setEdges((els) => addEdge(params, els)), []);
-  const newNodes = nodes.map((n) => {
-    return {...n, data:{...n.data, dataSetter:setData}}
-  })
+  const onRestore = useCallback(() => {
+    const restoreFlow = async () => {
+      const flow = JSON.parse(fs.readFileSync(`f:/${flowKey}.json`));
+
+      if (flow) {
+        const { x = 0, y = 0, zoom = 1 } = flow.viewport;
+        setNodes(flow.nodes || []);
+        setEdges(flow.edges || []);
+        setViewport({ x, y, zoom });
+      }
+    };
+
+    restoreFlow();
+  }, [setNodes, setViewport]);
+
+  const onAdd = useCallback(() => {
+    const newNode = {
+      id: getNodeId(),
+      data: { label: 'Added node\t', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}'},
+      position: {
+        x: Math.random() * window.innerWidth - 100,
+        y: Math.random() * window.innerHeight,
+      },
+    };
+    setNodes((nds) => nds.concat(newNode));
+  }, [setNodes]);
+
+  const onDoubleClicked = useCallback((e, node) => {
+    refNode.current = node;
+    setData(node.data);
+  }, [setData])
+
   useEffect(() => {
+    if(!refNode.current)
+      return;
     if(updateNode) {
       const v = getNodes().map((n) => {
-        if(n.data.title != updateNode.title)
+        if(n.id != refNode.current.id)
           return n;
         return {...n, data:{...updateNode}};
       })
-      console.log(v);
       setNodes(v);
     }
   }, [updateNode])
 
+ 
   return (
     <ReactFlow
-      nodes={newNodes}
+      nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
-      fitView
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={defaultEdgeOptions}
+      onInit={setRfInstance}
+      onNodeDoubleClick={onDoubleClicked}
     >
-      <Controls showInteractive={false} />
-      <svg>
-        <defs>
-          <linearGradient id="edge-gradient">
-            <stop offset="0%" stopColor="#ae53ba" />
-            <stop offset="100%" stopColor="#2a8af6" />
-          </linearGradient>
-
-          <marker
-            id="edge-circle"
-            viewBox="-5 -5 10 10"
-            refX="0"
-            refY="0"
-            markerUnits="strokeWidth"
-            markerWidth="10"
-            markerHeight="10"
-            orient="auto"
-          >
-            <circle stroke="#2a8af6" strokeOpacity="0.75" r="2" cx="0" cy="0" />
-          </marker>
-        </defs>
-      </svg>
+      <Controls />
+      <Panel position="top-right">
+        <Stack direction='row' spacing={4}>
+          <Button onClick={onSave}>save</Button>
+          <Button onClick={onRestore}>restore</Button>
+          <Button onClick={onAdd}>add node</Button>
+        </Stack>
+      </Panel>
     </ReactFlow>
   );
 };
-
-export default Flow;
