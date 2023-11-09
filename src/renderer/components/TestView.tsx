@@ -1,14 +1,12 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Button, Stack } from '@chakra-ui/react'
 import ReactFlow, {
   Controls,
-  ReactFlowProvider,
   useNodesState,
   useEdgesState,
   addEdge,
   useReactFlow,
   Panel,
-  applyNodeChanges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -52,7 +50,7 @@ export default  ({setData, updateNode}) => {
   const onAdd = useCallback(() => {
     const newNode = {
       id: getNodeId(),
-      data: { label: 'Added node\t', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}'},
+      data: { label: 'Added node', chainnerData: '{"version":"0.20.2","content":{"nodes":[],"edges":[],"viewport":{"x":0,"y":0,"zoom":1}},"timestamp":"2023-11-07T11:55:41.524Z","checksum":"f1372fb648293d72231fe9051f9cc3c0","migration":35}'},
       position: {
         x: Math.random() * window.innerWidth - 100,
         y: Math.random() * window.innerHeight,
@@ -79,7 +77,7 @@ export default  ({setData, updateNode}) => {
     }
   }, [updateNode])
 
- 
+
   return (
     <ReactFlow
       nodes={nodes}
