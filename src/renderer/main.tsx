@@ -1,45 +1,76 @@
-import { Box, Center, HStack, Text, VStack } from '@chakra-ui/react';
+import { Box, Center, Text, VStack } from '@chakra-ui/react';
 import { useState, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EdgeTypes, NodeTypes, ReactFlowProvider } from 'reactflow';
+import { ReactFlowProvider } from 'reactflow';
 import { useContext } from 'use-context-selector';
-import { NodeType } from '../common/common-types';
 import { getLocalStorage, getStorageKeys } from '../common/util';
 import { ChaiNNerLogo } from './components/chaiNNerLogo';
-import { CustomEdge } from './components/CustomEdge/CustomEdge';
-import { Header } from './components/Header/Header';
 import { HistoryProvider } from './components/HistoryProvider';
-import { Node } from './components/node/Node';
-import { NodeSelector } from './components/NodeSelectorPanel/NodeSelectorPanel';
-import { ReactFlowBox } from './components/ReactFlowBox';
 import { AlertBoxContext, AlertType } from './contexts/AlertBoxContext';
 import { BackendContext } from './contexts/BackendContext';
 import { DependencyProvider } from './contexts/DependencyContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
 import { GlobalProvider } from './contexts/GlobalNodeState';
-import { NodeDocumentationProvider } from './contexts/NodeDocumentationContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { useIpcRendererListener } from './hooks/useIpcRendererListener';
 import { useLastWindowSize } from './hooks/useLastWindowSize';
-import TestView from './components/TestView';
+import { assign, createMachine } from 'xstate';
+import { useMachine } from '@xstate/react';
+import { ConfigEditor } from './components/ConfigEditor';
+import TopologyView from './components/TopologyView';
 
-const nodeTypes: NodeTypes & Record<NodeType, unknown> = {
-    regularNode: Node,
-    newIterator: Node,
-    collector: Node,
-};
-const edgeTypes: EdgeTypes = {
-    main: CustomEdge,
-};
+const machine = createMachine({
+    /** @xstate-layout N4IgpgJg5mDOIC5SAtFQAjqDELQbeYDpB90YcE1Blo0EUjAYkDR-QRPjAgoME6HAbQAYBdRUABwHtYBLAFx6cAdmxAAPRAEYAHADZsjRYoAsygKzLZAJjUBOADQgAnlIDsp7OoDMkydbVXT0yVoC+rw2ix4iZQAvxgDIRdEysSCBcvALCohIIMvJKKuqaOgbGiFZaVti6jNqmmYySagWyyu6eGDh0VKSAMdqACEY1lCGiEfyCImGx8QqJqhraeoYmCM7YahUgXtW0tVSADqaAdsaAy36AIeatYe1RXaCxmtmJ0tJWRVqM0sojUiXYWlqyag5Fss6MqlMz2MvrtY0-ayomw43A60W6iAOfUUx1OLguV3ScTy2FMDzUsmKMgxplenyq2DogXqTVogWB4VBOxiUjk0MYJQuaMUDmuCC0BUseS0zlMjCsAsYuncHhAQk4EDgohmbSpnRpCAAtLI2cr8d4CCRZZF5RCEMotGzbGpUbintJdK93gz1bMqNqwbtxBkrLp6SVnlpdGpDUjbFpsNIhRarMpQ7plHZTLbvqtAZQHdS9WUEooXLpLQUfb7RsbsKddCGw8oI3ZZDGiQFE7q9i63YkPacvT62TzJDkLZirJjdHzNOURUA */
+    id: '全局框架',
+    initial: '设备拓扑',
+    context: { currentNode: {} },
+    states: {
+        设备拓扑: {
+            on: {
+                编辑节点: {
+                    target: '节点编辑',
+                    actions: assign({
+                        currentNode: (data) => data.event.node,
+                    }),
+                },
+                运行节点: '节点运行',
+            },
+        },
+
+        节点编辑: {
+            on: {
+                完成节点编辑: {
+                    target: '设备拓扑',
+                    actions: assign({
+                        currentNode: (data) => data.event.node,
+                    }),
+                },
+                编辑数据结构: '数据结构编辑',
+            },
+        },
+
+        数据结构编辑: {
+            on: {
+                完成数据结构编辑: '节点编辑',
+            },
+        },
+
+        节点运行: {
+            on: {
+                完成节点运行: '设备拓扑',
+            },
+        },
+    },
+});
 
 export const Main = memo(() => {
-    const [data, setData] = useState();
-    const [updateNode, setUpdateNode] = useState();
+    const [newNode, setNewNode] = useState();
     const { t, ready } = useTranslation();
     const { sendAlert } = useContext(AlertBoxContext);
     const { connectionState } = useContext(BackendContext);
-
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+    const [current, send, actorRef] = useMachine(machine);
 
     useLastWindowSize();
 
@@ -89,64 +120,36 @@ export const Main = memo(() => {
         );
     }
 
-    const handleSwitchBack = () => {
-        setData(undefined);
-    }
-
     return (
-        <ReactFlowProvider>
-            <SettingsProvider>
-                <GlobalProvider reactFlowWrapper={reactFlowWrapper} data={data} onSwitchBack={setUpdateNode}>
-                    <NodeDocumentationProvider>
-                        <ExecutionProvider>
-                            <DependencyProvider>
-                                <HistoryProvider>
-                                    <VStack
-                                        bg="var(--window-bg)"
-                                        h="100vh"
-                                        overflow="hidden"
-                                        p={2}
-                                        w="100vw"
-                                        hidden={data == undefined}
-                                    >
-                                        <Header onSwitchBack={handleSwitchBack} />
-                                        <HStack
-                                            h="calc(100vh - 80px)"
-                                            w="full"
-                                        >
-                                            <NodeSelector />
-                                            <ReactFlowBox
-                                                edgeTypes={edgeTypes}
-                                                nodeTypes={nodeTypes}
-                                                wrapperRef={reactFlowWrapper}
-                                            />
-                                        </HStack>
-                                    </VStack>
-                                    <VStack
-                                        bg="var(--window-bg)"
-                                        h="100vh"
-                                        overflow="hidden"
-                                        p={2}
-                                        w="100vw"
-                                        hidden={data != undefined}
-                                    >
-                                        <Header />
-                                        <HStack
-                                            h="calc(100vh - 80px)"
-                                            w="full"
-                                        >
-                                            <NodeSelector />
-                                            <ReactFlowProvider>
-                                                <TestView setData={setData} updateNode={updateNode} />
-                                            </ReactFlowProvider>
-                                        </HStack>
-                                    </VStack>
-                                </HistoryProvider>
-                            </DependencyProvider>
-                        </ExecutionProvider>
-                    </NodeDocumentationProvider>
+        <SettingsProvider>
+            <ReactFlowProvider>
+                <GlobalProvider
+                    reactFlowWrapper={reactFlowWrapper}
+                    state={current}
+                    send={send}
+                    onComplete={(node) => {
+                        send({ type: '完成节点编辑', node });
+                    }}
+                >
+                    <ExecutionProvider>
+                        <DependencyProvider>
+                            <HistoryProvider>
+                                <ConfigEditor
+                                    isHidden={!current.matches('节点编辑')}
+                                    reactFlowWrapper={reactFlowWrapper}
+                                />
+                                <TopologyView
+                                    state={current}
+                                    isHidden={!current.matches('设备拓扑')}
+                                    onNodeDoubleClicked={(node) => {
+                                        send({ type: '编辑节点', node });
+                                    }}
+                                />
+                            </HistoryProvider>
+                        </DependencyProvider>
+                    </ExecutionProvider>
                 </GlobalProvider>
-            </SettingsProvider>
-        </ReactFlowProvider>
+            </ReactFlowProvider>
+        </SettingsProvider>
     );
 });

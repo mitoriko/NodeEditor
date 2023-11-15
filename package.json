@@ -116,6 +116,7 @@
     "@fontsource/open-sans": "^4.5.10",
     "@octokit/rest": "^19.0.13",
     "@react-nano/use-event-source": "^0.12.0",
+    "@xstate/react": "^4.0.0-beta.11",
     "adm-zip": "^0.5.10",
     "bezier-js": "^6.1.0",
     "chakra-ui-markdown-renderer": "^4.1.0",
@@ -128,7 +129,7 @@
     "framer-motion": "^6.3.6",
     "html-to-image": "^1.10.8",
     "i18next": "^22.0.5",
-    "immer": "^10.0.2",
+    "immer": "^10.0.3",
     "javascript-time-ago": "^2.5.9",
     "minisearch": "^6.1.0",
     "node-localstorage": "^2.2.1",
@@ -153,8 +154,10 @@
     "undici": "^5.26.2",
     "use-context-selector": "^1.4.0",
     "use-debounce": "^8.0.1",
+    "use-immer": "^0.9.0",
     "uuid": "^8.3.2",
     "wcag-contrast": "^3.0.0",
+    "xstate": "^5.0.0-beta.42",
     "yargs": "^17.5.1"
   },
   "optionalDependencies": {

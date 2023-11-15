@@ -92,6 +92,7 @@ import { getSessionStorageOrDefault, useSessionStorage } from '../hooks/useSessi
 import { AlertBoxContext, AlertType } from './AlertBoxContext';
 import { BackendContext } from './BackendContext';
 import { SettingsContext } from './SettingsContext';
+import { produce } from 'immer';
 
 const EMPTY_CONNECTED: readonly [IdSet<InputId>, IdSet<OutputId>] = [IdSet.empty, IdSet.empty];
 
@@ -144,6 +145,7 @@ interface Global {
     outputDataActions: OutputDataActions;
     getInputHash: (nodeId: string) => string;
     hasRelevantUnsavedChangesRef: React.MutableRefObject<boolean>;
+    handleComplete: (node: any) => void;
 }
 
 enum SaveResult {
@@ -161,12 +163,19 @@ export const GlobalContext = createContext<Readonly<Global>>({} as Global);
 
 interface GlobalProviderProps {
     reactFlowWrapper: React.RefObject<HTMLDivElement>;
-    data?: any;
-    onSwitchBack?: any;
+    state;
+    send;
+    onComplete: (node: any) => void;
 }
 
 export const GlobalProvider = memo(
-    ({ children, reactFlowWrapper, data, onSwitchBack }: React.PropsWithChildren<GlobalProviderProps>) => {
+    ({
+        children,
+        reactFlowWrapper,
+        state,
+        send,
+        onComplete,
+    }: React.PropsWithChildren<GlobalProviderProps>) => {
         const { sendAlert, sendToast, showAlert } = useContext(AlertBoxContext);
         const { schemata, functionDefinitions, scope, backend } = useContext(BackendContext);
         const { useStartupTemplate, useViewportExportPadding } = useContext(SettingsContext);
@@ -521,10 +530,11 @@ export const GlobalProvider = memo(
         );
 
         const setStateFromJSON = useCallback(
-            async (savedData: ParsedSaveData, path: string, loadPosition = false) => {
-                if ((await saveUnsavedChanges()) === SaveResult.Canceled) {
-                    return;
-                }
+            (savedData: ParsedSaveData, path: string, loadPosition = false, testUnsaved = false) => {
+                // if(testUnsaved)
+                //     if ((await saveUnsavedChanges()) === SaveResult.Canceled) {
+                //         return;
+                //     }
 
                 const validNodes = savedData.nodes
                     // remove nodes that are not supported
@@ -613,10 +623,11 @@ export const GlobalProvider = memo(
         const setStateFromJSONRef = useRef(setStateFromJSON);
         setStateFromJSONRef.current = setStateFromJSON;
 
-        const clearState = useCallback(async () => {
-            if ((await saveUnsavedChanges()) === SaveResult.Canceled) {
-                return;
-            }
+        const clearState = useCallback(async (isSave=false) => {
+            if (isSave)
+                if ((await saveUnsavedChanges()) === SaveResult.Canceled) {
+                    return;
+                }
 
             changeNodes([]);
             changeEdges([]);
@@ -678,7 +689,6 @@ export const GlobalProvider = memo(
                 [removeRecentPath, sendAlert]
             )
         );
-
 
         // Register Save/Save-As event handlers
         useIpcRendererListener(
@@ -1313,6 +1323,14 @@ export const GlobalProvider = memo(
             );
         }, [schemata, getNodes, removeNodesById]);
 
+        const handleComplete = useCallback(() => {
+            // 下面使用immer的produce生成一个新的state.context.node对象，并用json数据替代state.context.node.data.configData的数据。
+            const newNode = produce(state.context.currentNode, (draftNode) => {
+                draftNode.data.source = SaveFile.stringify(dumpState(), '0.20.2');
+            });
+            onComplete(newNode);
+        }, [onComplete]);
+
         const globalVolatileValue = useMemoObject<GlobalVolatile>({
             nodeChanges,
             edgeChanges,
@@ -1363,22 +1381,28 @@ export const GlobalProvider = memo(
             outputDataActions,
             getInputHash,
             hasRelevantUnsavedChangesRef,
+            handleComplete,
         });
 
-        useAsyncEffect(() => async () => {
-            if(data) {
-                prevValue.current = data;
-                await setStateFromJSONRef.current(SaveFile.parse(data.chainnerData), '', true);
-            }
-        }, [data])
-
-        useEffect(() => {
-                const json = SaveFile.stringify(dumpState(), '0.20.2');
-                let v = prevValue.current;
-                v = {...v, chainnerData: json};
-                onSwitchBack(v);
-                hasRelevantUnsavedChangesRef.current = false;
-        }, [nodeChanges, edgeChanges])
+        useEffect(
+            () => {
+                if (state.matches('节点编辑')) {
+                    const data = state.context.currentNode.data.source;
+                    if(data)
+                    {
+                        console.log(data)
+                        setStateFromJSONRef.current(
+                            SaveFile.parse(data),
+                            '',
+                            true
+                        );
+                    } else {
+                        clearState();
+                    }
+                }
+            },
+            [state]
+        );
 
         return (
             <GlobalVolatileContext.Provider value={globalVolatileValue}>
