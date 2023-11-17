@@ -145,7 +145,7 @@ interface Global {
     outputDataActions: OutputDataActions;
     getInputHash: (nodeId: string) => string;
     hasRelevantUnsavedChangesRef: React.MutableRefObject<boolean>;
-    handleComplete: (node: any) => void;
+    // handleComplete: (node: any) => void;
 }
 
 enum SaveResult {
@@ -163,18 +163,12 @@ export const GlobalContext = createContext<Readonly<Global>>({} as Global);
 
 interface GlobalProviderProps {
     reactFlowWrapper: React.RefObject<HTMLDivElement>;
-    state;
-    send;
-    onComplete: (node: any) => void;
 }
 
 export const GlobalProvider = memo(
     ({
         children,
         reactFlowWrapper,
-        state,
-        send,
-        onComplete,
     }: React.PropsWithChildren<GlobalProviderProps>) => {
         const { sendAlert, sendToast, showAlert } = useContext(AlertBoxContext);
         const { schemata, functionDefinitions, scope, backend } = useContext(BackendContext);
@@ -1323,13 +1317,13 @@ export const GlobalProvider = memo(
             );
         }, [schemata, getNodes, removeNodesById]);
 
-        const handleComplete = useCallback(() => {
-            // 下面使用immer的produce生成一个新的state.context.node对象，并用json数据替代state.context.node.data.configData的数据。
-            const newNode = produce(state.context.currentNode, (draftNode) => {
-                draftNode.data.source = SaveFile.stringify(dumpState(), '0.20.2');
-            });
-            onComplete(newNode);
-        }, [onComplete]);
+        // const handleComplete = useCallback(() => {
+        //     // 下面使用immer的produce生成一个新的state.context.node对象，并用json数据替代state.context.node.data.configData的数据。
+        //     const newNode = produce(state.context.currentNode, (draftNode) => {
+        //         draftNode.data.source = SaveFile.stringify(dumpState(), '0.20.2');
+        //     });
+        //     onComplete(newNode);
+        // }, [onComplete]);
 
         const globalVolatileValue = useMemoObject<GlobalVolatile>({
             nodeChanges,
@@ -1381,28 +1375,28 @@ export const GlobalProvider = memo(
             outputDataActions,
             getInputHash,
             hasRelevantUnsavedChangesRef,
-            handleComplete,
+            // handleComplete,
         });
 
-        useEffect(
-            () => {
-                if (state.matches('节点编辑')) {
-                    const data = state.context.currentNode.data.source;
-                    if(data)
-                    {
-                        console.log(data)
-                        setStateFromJSONRef.current(
-                            SaveFile.parse(data),
-                            '',
-                            true
-                        );
-                    } else {
-                        clearState();
-                    }
-                }
-            },
-            [state]
-        );
+        // useEffect(
+        //     () => {
+        //         if (state.matches('节点编辑')) {
+        //             const data = state.context.currentNode.data.source;
+        //             if(data)
+        //             {
+        //                 console.log(data)
+        //                 setStateFromJSONRef.current(
+        //                     SaveFile.parse(data),
+        //                     '',
+        //                     true
+        //                 );
+        //             } else {
+        //                 clearState();
+        //             }
+        //         }
+        //     },
+        //     [state]
+        // );
 
         return (
             <GlobalVolatileContext.Provider value={globalVolatileValue}>

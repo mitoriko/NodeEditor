@@ -8,6 +8,7 @@ import { Node } from './node/Node';
 import { NodeSelector } from './NodeSelectorPanel/NodeSelectorPanel';
 import { ReactFlowBox } from './ReactFlowBox';
 import { NodeDocumentationProvider } from '../contexts/NodeDocumentationContext';
+import { GlobalStateContext } from '../contexts/GlobalStateContext';
 
 const nodeTypes: NodeTypes & Record<NodeType, unknown> = {
     regularNode: Node,
@@ -20,11 +21,11 @@ const edgeTypes: EdgeTypes = {
 };
 
 interface Props {
-    isHidden: boolean;
     reactFlowWrapper: RefObject<HTMLDivElement>;
 }
 
-export const ConfigEditor = memo(({ isHidden, reactFlowWrapper }: Props) => {
+export const ConfigEditor = memo(({ reactFlowWrapper }: Props) => {
+    const isHidden = GlobalStateContext.useSelector((state) => !state.matches('节点编辑'));
     return (
         <VStack
             bg="var(--window-bg)"

@@ -3,78 +3,137 @@ import { produce } from 'immer';
 import { Button, HStack, Stack, VStack } from '@chakra-ui/react';
 import ReactFlow, {
     Controls,
-    useNodesState,
-    useEdgesState,
-    addEdge,
     Panel,
     ReactFlowProvider,
-    Connection,
-    Edge,
     Node,
     SmoothStepEdge,
     ConnectionLineType,
+    NodeChange,
+    EdgeChange,
+    useReactFlow,
+    Connection,
+    useNodesState,
 } from 'reactflow';
+import { GlobalStateContext } from '../contexts/GlobalStateContext';
+import { Header } from './Header/Header';
+import { assign, createMachine, log, raise, sendTo } from 'xstate';
+import { createActorContext, useMachine } from '@xstate/react';
+import useTopologyStore from '../hooks/useTopologyStore';
+
 import 'reactflow/dist/style.css';
 
+const machine = createMachine({
+    /** @xstate-layout N4IgpgJg5mDOIC5QBUD2AHVAbVUCeAagJZgDuAdAEpgCGEeAxAMoAuNATiwHKoRgAi7GlADC7WiyKoAdgG0ADAF1EoTLCKSZKkAA9EARgCch8oYDsZgCwA2M-vn2ArNcsAmADQg8B1yesAOeUd9V3lLMOtHQwBfaM80TBx8YjJyHj5BYTEJKWkGEVQAW3QsMBYwdIEhKAVlJBA1DVztPQRXfUtyeW7DMMtDF30AZn9PbwQh+VdyV19reSHHIZDDf39Y+IxsXEISCkrM0XEaTTyRGmkAY1LK7JPc2u1G05bEef1yR1nrH-9+s3kZkcYx8fkCwVC4Rsjn8MTiIAS22SezSvDAd1ODAAYkRpERYAALW7HU6PerPZr1VrzRzkEJuOzmIY-IYgiZTGZzBZLFZrWLw6Ro+D1RFJXZkJ6odQvKkGYKmCw2OwOIIuDxeRAAWhCnLcrkcZn8IT+-kiGwRWzFKQo1Do41UUqaWllCEsQzMXUMjimNnmPxhljZQJmQLMhmZjhh8ms+jM5tFO2tqIy1QxlId0vTukQ4Q+sPMgOshlc1hL1lZGrark65kipZcBtmjks8ctiZRxJyzozTukr1dRk5hqGQwGI30zcDlZGnWZvT+QInhbj-KAA */
+    id: 'TopologyView',
+    initial: 'Ready',
+    context: ({ input }) => ({
+        globalMachine: input.globalMachineRef,
+        connectingNodeId: '',
+    }),
+    states: {
+        Ready: {
+            entry: log('Ready'),
+            on: {
+                StartNodeDragCreation: {
+                    target: 'NodeDragCreation',
+                    actions: [
+                        assign({
+                            connectingNodeId: ({ event }) => event.connectingNodeId,
+                        }),
+                    ],
+                },
+            },
+        },
+
+        NodeDragCreation: {
+            entry: [log('NodeDragCreation')],
+            on: {
+                CompleteNodeDrag: {
+                    target: 'NodeCreation',
+                    actions: [log((a) => a)]
+                },
+                CancleNodeCreation: {
+                    target: 'Ready',
+                    actions: [
+                        assign({
+                            connectingNodeId: '',
+                        }),
+                    ],
+                },
+            },
+        },
+        NodeCreation: {
+            entry: [log('NodeCreation'),
+                    (para) => {
+                        console.log(para);
+                        const { connectingNodeId } = para.context;
+                        const { position } = para.event;
+                        const newNode = {
+                            id: `${Math.random()}`,
+                            type: 'default',
+                            data: { label: 'Node 1' },
+                            position: position,
+                        };
+                        para.event.onNodesChange([{ type: 'add', item: newNode }]);
+                        para.event.onEdgesChange([{ type: 'add', source: connectingNodeId, target: newNode.id }]);
+                    },],
+            on: {
+                FinishNodeCreation: {
+                    target: 'Ready',
+                    actions: log('FinishNodeCreation'),
+                },
+            },
+            after: {
+                100: {
+                    target: 'Ready',
+                    actions: [log('NodeCreation always'),],
+                },
+            },
+        },
+    },
+});
+
 const edgeTypes = {
-    'smoothstep': SmoothStepEdge
+    smoothstep: SmoothStepEdge,
 };
 
-interface Props {
-    isHidden: boolean;
-    onNodeDoubleClicked: (node: Node) => void;
-    state;
-}
+export default memo(({}) => {
+    const send = GlobalStateContext.useActorRef().send;
+    const isHidden = GlobalStateContext.useSelector((state) => !state.matches('设备拓扑'));
+    const { project } = useReactFlow();
+    const nodes = useTopologyStore((state) => state.nodes);
+    const edges = useTopologyStore((state) => state.edges);
+    const onNodesChange = useTopologyStore((state) => state.onNodesChange);
+    const onEdgesChange = useTopologyStore((state) => state.onEdgesChange);
+    const onConnect = useTopologyStore((state) => state.onConnect);
 
-export default memo(({ isHidden, onNodeDoubleClicked, state }: Props) => {
-    // 以下定义的方法实现常规的ReactFlow事件处理：onNodesChange, onEdgesChange, onConnect
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const onConnect = useCallback(
-        (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
-    );
-
-    // 生成符合ReactFlow组件onNodeDoubleClick类型要求的事件处理方法，该方法将事件处理委托给外部的onNodeDoubleClicked方法实现。
-    const onNodeDoubleClick = useCallback(
-        (_event: any, node: any) => {
-            onNodeDoubleClicked(node);
+    const [current, localSend] = useMachine(machine, {
+        input: {
+            globalMachineRef: GlobalStateContext.useActorRef(),
         },
-        [onNodeDoubleClicked]
+    });
+
+    const onConnectStart = useCallback(
+        (_, { nodeId }) => {
+            localSend({ type: 'StartNodeDragCreation', connectingNodeId: nodeId });
+        },
+        [localSend]
     );
 
-    // 以下方法实现常规的onAdd事件处理方法。该方法在屏幕中心添加一个新的节点。方法中使用immer库实现了对nodes数组的不可变更新。
-    const onAdd = useCallback(() => {
-        setNodes((ns) =>
-            produce(ns, (draft) => {
-                draft.push({
-                    id: draft.length.toString(),
-                    type: 'default',
-                    position: {
-                        x: window.innerWidth / 2,
-                        y: window.innerHeight / 2,
-                    },
-                    data: { label: 'Added node', source: '' },
+    const onConnectEnd = useCallback(
+        (event) => {
+            if (!event.target.classList.contains('react-flow__pane')) {
+                localSend({ type: 'CancleNodeCreation' });
+            } else {
+                const position = project({
+                    x: event.clientX,
+                    y: event.clientY,
                 });
-            })
-        );
-    }, [setNodes]);
-
-    useEffect(() => {
-        // 如果newNode不为空，则使用immer库的produce方法实现对nodes数组相同id的Node的不可变更新。
-        const newNode = state.context.currentNode;
-        if(newNode) {
-            setNodes((ns) =>
-                produce(ns, (draft) => {
-                    const node = draft.find((n) => n.id === newNode.id);
-                    if(node) {
-                        node.data = newNode.data;
-                    }
-                })
-            );
-        }
-    }, [state]);
-
+                localSend({ type: 'CompleteNodeDrag', position: position, onNodesChange: onNodesChange, onEdgesChange: onEdgesChange });
+            }
+        },
+        [localSend, project]
+    );
 
     return (
         <VStack
@@ -85,6 +144,7 @@ export default memo(({ isHidden, onNodeDoubleClicked, state }: Props) => {
             w="100vw"
             hidden={isHidden}
         >
+            <Header />
             <HStack
                 h="calc(100vh - 80px)"
                 w="full"
@@ -95,11 +155,13 @@ export default memo(({ isHidden, onNodeDoubleClicked, state }: Props) => {
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
+                        // onNodeDoubleClick={onNodeDoubleClick}
+                        onConnectStart={onConnectStart}
+                        onConnectEnd={onConnectEnd}
                         onConnect={onConnect}
-                        onNodeDoubleClick={onNodeDoubleClick}
                         connectionLineType={ConnectionLineType.SmoothStep}
                         edgeTypes={edgeTypes}
-                        defaultEdgeOptions={{type:'smoothstep'}}
+                        defaultEdgeOptions={{ type: 'smoothstep' }}
                     >
                         <Controls />
                         <Panel position="top-right">
@@ -109,7 +171,7 @@ export default memo(({ isHidden, onNodeDoubleClicked, state }: Props) => {
                             >
                                 {/* <Button onClick={onSave}>save</Button> */}
                                 {/* <Button onClick={onRestore}>restore</Button> */}
-                                <Button onClick={onAdd}>add node</Button>
+                                {/* <Button onClick={onAdd}>add node</Button> */}
                             </Stack>
                         </Panel>
                     </ReactFlow>

@@ -79,6 +79,7 @@
     "sanic",
     "Scharr",
     "setflags",
+    "smoothstep",
     "sobel",
     "SPSR",
     "SRGAN",
@@ -101,8 +102,9 @@
     "vkallocator",
     "vram",
     "vulkan",
-    "YUV"
-  ],
+    "YUV",
+    "zustand"
+],
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,

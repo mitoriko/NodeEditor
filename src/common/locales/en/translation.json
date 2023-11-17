@@ -4,6 +4,7 @@
       "systemInformation": "System information"
     }
   },
+  "connectionFailed": "Connection failed",
   "dependencyManager": {
     "manageDependencies": "Manage Dependencies"
   },

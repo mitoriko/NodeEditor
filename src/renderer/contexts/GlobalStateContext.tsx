@@ -1,17 +1,20 @@
-import { assign, createMachine } from 'xstate';
+import { assign, createMachine, log } from 'xstate';
 import { createActorContext } from '@xstate/react';
+import { addEdge, applyEdgeChanges, applyNodeChanges } from 'reactflow';
 
 const machine = createMachine({
-    /** @xstate-layout N4IgpgJg5mDOIC5SAtFQAjqDELQbeYDpB90YcE1Blo0EUjAYkDR-QRPjAgoME6HAbQAYBdRUABwHtYBLAFx6cAdmxAAPRAEYAHADZsjRYoAsygKzLZAJjUBOADQgAnlIDsp7OoDMkydbVXT0yVoC+rw2ix4iZQAvxgDIRdEysSCBcvALCohIIMvJKKuqaOgbGiFZaVti6jNqmmYySagWyyu6eGDh0VKSAMdqACEY1lCGiEfyCImGx8QqJqhraeoYmCM7YahUgXtW0tVSADqaAdsaAy36AIeatYe1RXaCxmtmJ0tJWRVqM0sojUiXYWlqyag5Fss6MqlMz2MvrtY0-ayomw43A60W6iAOfUUx1OLguV3ScTy2FMDzUsmKMgxplenyq2DogXqTVogWB4VBOxiUjk0MYJQuaMUDmuCC0BUseS0zlMjCsAsYuncHhAQk4EDgohmbSpnRpCAAtLI2cr8d4CCRZZF5RCEMotGzbGpUbintJdK93gz1bMqNqwbtxBkrLp6SVnlpdGpDUjbFpsNIhRarMpQ7plHZTLbvqtAZQHdS9WUEooXLpLQUfb7RsbsKddCGw8oI3ZZDGiQFE7q9i63YkPacvT62TzJDkLZirJjdHzNOURUA */
+    /** @xstate-layout N4IgpgJg5mDOIC5SAtFQAjqDELQbeYDpB90YcE1Blo0EUjAYkDR-QRPjAgoME6HAbQAYBdRUABwHtYBLAFx6cAdmxAAPRAEYAHADZsjRYoAsygKzLZAJjUBOADQgAnlIDsp7OoDMkydbVXT0yVoC+rw2ix4iZQAvxgDIRdEysSCBcvALCohIIMvJKKuqaOgbGiFZaVti6jNqmmYySagWyyu6eGDgEJKQAcgDyACIAogDKAPoAwgASAIJ1AOItTSGiEfyCImGxOrKGJghW2WoVIF7VvqQjw529A8OjLOPck9EziHMLiAC0dtirHutV2HRUpIAx2oAIRm+UY2ETKLTUCxeIKJQlRjSUxaRQOa4IXTZRjKXRogpaUwyFG6NYbV60d5UQAOpoA7Y0Ay36AEPN-hxTkCYohNMilNJpFYirDpMoEcULFotLI1A4irJnCjyk98WSqe9vtLKVQaeE6VMGQgmeDFKz2S4odz0nE8tgYYLZMUZGpZKZRXiXnRAp8frRAkrAaqLnE5JrGJDobCfVYEZjsso8lpnKZGMt2bi1kJOBA4KINidIu6Qbd5ga7kUcmjdGzZLllNbdBLKt4asRU2dgeJGVoecVjdahdJdKKUT7bd5fjX6R7lrpvSVhVpdGpGwbbFpsNJGAWkcorKjlHZTD2cPKqP30-WEGUEooXGirVZJ1PFrY1NgY+2Vyuy3ZZJuCYFd+cM0srMPEqP2eOk5Bs4OTtmaVhmrokaaBK7hAA */
     id: '全局框架',
     initial: '设备拓扑',
     context: {
         currentNode: {},
-        topology: {
-            nodes: [],
-            edges: [],
-            viewport,
-        }
+        nodes: [{
+            id: '0',
+            type: 'default',
+            data: { label: 'Node 1' },
+            position: { x: 100, y: 100 },
+        }],
+        edges: [],
     },
     states: {
         设备拓扑: {
@@ -23,6 +26,15 @@ const machine = createMachine({
                     }),
                 },
                 运行节点: '节点运行',
+                NODES_CHANGED: {
+                    actions: ['changeNodes', log('NODES_CHANGED')],
+                },
+                EDGES_CHANGED: {
+                    actions: ['changeEdges', log('EDGES_CHANGED'), log(({context})=>context)],
+                },
+                CONNECT_NODES: {
+                    actions: [log('Enter Connect_Nodes'), 'connectNodes', log('CONNECT_NODES')],
+                }
             },
         },
 
@@ -50,6 +62,18 @@ const machine = createMachine({
             },
         },
     },
+}).provide({
+    actions: {
+        changeNodes: assign({
+            nodes: ({context, event}) => applyNodeChanges(event.changes, context.nodes),
+        }),
+        changeEdges: assign({
+            edges: ({context, event}) => applyEdgeChanges(event.changes, context.edges),
+        }),
+        connectNodes: assign({
+            edges: ({context, event}) => addEdge(event.connection, context.edges),
+        })
+    }
 });
 
 
